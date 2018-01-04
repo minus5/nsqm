@@ -1,6 +1,11 @@
 package nsqm
 
-import nsq "github.com/nsqio/go-nsq"
+import (
+	"fmt"
+
+	"github.com/minus5/nsqm/discovery"
+	nsq "github.com/nsqio/go-nsq"
+)
 
 const (
 	defaultConcurrency = 256
@@ -12,13 +17,13 @@ type Configurator interface {
 	Config() *nsq.Config
 	Concurrency() int
 	Output(calldepth int, s string) error
-	SetLookupdDiscovery(lookupdDiscovery)
+	Subscribe(discovery.Subscriber)
 }
 
-type lookupdDiscovery interface {
-	DisconnectFromNSQLookupd(addr string) error
-	ConnectToNSQLookupd(addr string) error
-}
+// type lookupdDiscovery interface {
+// 	DisconnectFromNSQLookupd(addr string) error
+// 	ConnectToNSQLookupd(addr string) error
+// }
 
 func NewProducer(cfgr Configurator) (*nsq.Producer, error) {
 	producer, err := nsq.NewProducer(cfgr.NSQDAddress(), cfgr.Config())
@@ -45,7 +50,7 @@ func NewConsumer(cfgr Configurator, topic, channel string, handler nsq.Handler) 
 			return nil, err
 		}
 	}
-	cfgr.SetLookupdDiscovery(consumer)
+	cfgr.Subscribe(consumer)
 	return consumer, nil
 }
 
@@ -75,19 +80,20 @@ func (c *localConfigurator) Concurrency() int {
 	return defaultConcurrency
 }
 
-func (c *localConfigurator) SetLookupdDiscovery(ld lookupdDiscovery) {}
+func (c *localConfigurator) Subscribe(s discovery.Subscriber) {}
 
-type discovery interface {
+type discoverer interface {
 	NSQDAddress() (string, error)
 	NSQLookupdAddresses() ([]string, error)
+	Subscribe(discovery.Subscriber)
 }
 
-func WithDiscovery(dcy discovery) Configurator {
+func WithDiscovery(dcy discoverer) Configurator {
 	return &discoveryConfigurator{dcy: dcy}
 }
 
 type discoveryConfigurator struct {
-	dcy discovery
+	dcy discoverer
 }
 
 func (c *discoveryConfigurator) NSQDAddress() string {
@@ -105,6 +111,7 @@ func (c *discoveryConfigurator) Config() *nsq.Config {
 }
 
 func (c *discoveryConfigurator) Output(calldepth int, s string) error {
+	fmt.Printf("%s\n", s)
 	return nil
 }
 
@@ -112,6 +119,6 @@ func (c *discoveryConfigurator) Concurrency() int {
 	return defaultConcurrency
 }
 
-func (c *discoveryConfigurator) SetLookupdDiscovery(ld lookupdDiscovery) {
-
+func (c *discoveryConfigurator) Subscribe(s discovery.Subscriber) {
+	c.dcy.Subscribe(s)
 }

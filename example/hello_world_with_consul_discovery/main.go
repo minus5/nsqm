@@ -27,6 +27,9 @@ func main() {
 	fmt.Println(dcy.NSQLookupdAddresses())
 	fmt.Printf("NSQDAddress: ")
 	fmt.Println(dcy.NSQDAddress())
+
+	//dcy.Monitor()
+
 	// configuration with discovery
 	cfgr := nsqm.WithDiscovery(dcy)
 	// create producer
@@ -45,6 +48,11 @@ func main() {
 	}
 	// waith for consumer to receive a message
 	fmt.Printf("received: %s\n", <-msgs)
+
+	for {
+		fmt.Printf("received: %s\n", <-msgs)
+	}
+
 	producer.Stop()
 	consumer.Stop()
 }

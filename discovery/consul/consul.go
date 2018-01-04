@@ -2,8 +2,12 @@ package consul
 
 import (
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/hashicorp/consul/api"
+	"github.com/minus5/nsqm/discovery"
+	"github.com/minus5/svckit/log"
 )
 
 const (
@@ -11,22 +15,26 @@ const (
 	nsqdTCPServiceName        = "nsqd-tcp"
 )
 
-func New(addr string) (*discovery, error) {
+func New(addr string) (*dcy, error) {
 	cfg := api.DefaultConfig()
 	cfg.Address = addr
 	cli, err := api.NewClient(cfg)
 	if err != nil {
 		return nil, err
 	}
-	return &discovery{cli: cli, addr: addr}, nil
+	return &dcy{cli: cli, addr: addr}, nil
 }
 
-type discovery struct {
-	addr string
-	cli  *api.Client
+type dcy struct {
+	addr         string
+	cli          *api.Client
+	lookupdAddrs []string
+	subscribers  []discovery.Subscriber
+	sync.Mutex
+	monitorOnce sync.Once
 }
 
-func (d *discovery) NSQDAddress() (string, error) {
+func (d *dcy) NSQDAddress() (string, error) {
 	addr, err := d.agentService(nsqdTCPServiceName)
 	if err != nil {
 		return "", err
@@ -46,7 +54,7 @@ func (d *discovery) NSQDAddress() (string, error) {
 	return addrs[0], nil
 }
 
-func (d *discovery) agentService(name string) (string, error) {
+func (d *dcy) agentService(name string) (string, error) {
 	svcs, err := d.cli.Agent().Services()
 	if err != nil {
 		return "", err
@@ -63,15 +71,16 @@ func (d *discovery) agentService(name string) (string, error) {
 	return "", nil
 }
 
-func (d *discovery) NSQLookupdAddresses() ([]string, error) {
+func (d *dcy) NSQLookupdAddresses() ([]string, error) {
 	ses, err := d.service(nsqLookupdHTTPServiceName)
 	if err != nil {
 		return nil, err
 	}
-	return parseServiceEntries(ses), nil
+	d.lookupdAddrs = parseServiceEntries(ses)
+	return d.lookupdAddrs, nil
 }
 
-func (d *discovery) service(name string) ([]*api.ServiceEntry, error) {
+func (d *dcy) service(name string) ([]*api.ServiceEntry, error) {
 	ses, _, err := d.cli.Health().Service(name, "", true, nil)
 	return ses, err
 }
@@ -87,3 +96,78 @@ func parseServiceEntries(ses []*api.ServiceEntry) []string {
 	}
 	return addrs
 }
+
+func (d *dcy) monitor() {
+	var wi uint64
+	for {
+		qo := &api.QueryOptions{
+			WaitIndex:         wi,
+			WaitTime:          time.Minute,
+			AllowStale:        true,
+			RequireConsistent: false,
+		}
+		ses, qm, err := d.cli.Health().Service(nsqLookupdHTTPServiceName, "", true, qo)
+		if err != nil {
+			log.Error(err) // TODO
+			time.Sleep(time.Second)
+			continue
+		}
+		addrs := parseServiceEntries(ses)
+		d.updateLookups(addrs)
+		wi = qm.LastIndex
+	}
+}
+
+func (d *dcy) Subscribe(s discovery.Subscriber) {
+	d.Lock()
+	defer d.Unlock()
+	d.subscribers = append(d.subscribers, s)
+	d.monitorOnce.Do(func() {
+		go d.monitor()
+	})
+}
+
+func (d *dcy) updateLookups(addrs []string) {
+	d.Lock()
+	defer d.Unlock()
+	contains := func(addrs []string, addr string) bool {
+		for _, a := range addrs {
+			if a == addr {
+				return true
+			}
+		}
+		return false
+	}
+	changed := false
+	for _, subscriber := range d.subscribers {
+		for _, addr := range addrs {
+			// add newly discovered lookupd
+			if !contains(d.lookupdAddrs, addr) {
+				changed = true
+				fmt.Println("ConnectToNSQLookupd", addr) // TODO
+				if err := subscriber.ConnectToNSQLookupd(addr); err != nil {
+					// TODO logging
+					log.Error(err)
+				}
+			}
+		}
+		for _, addr := range d.lookupdAddrs {
+			// remove lookupd which don't exists any more
+			if !contains(addrs, addr) {
+				changed = true
+				fmt.Println("DisconnectFromNSQLookupd", addr) // TODO
+				if err := subscriber.DisconnectFromNSQLookupd(addr); err != nil {
+					// TODO logging
+					log.Error(err)
+				}
+			}
+		}
+	}
+	if changed {
+		fmt.Printf("updating lookupds to %v\n", addrs)
+		d.lookupdAddrs = addrs
+	}
+}
+
+// testing register example:
+// curl -s -X PUT -d '{"Node":"app1","Address":"10.0.66.157","Service":{"Service":"nsqlookupd-http","Port":10901}}' http://127.0.0.1:8500/v1/catalog/register

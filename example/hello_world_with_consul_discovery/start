@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "starting nsqlookupd, log is in tmp/nsqlookupd.log"
+echo "starting nsqlookupd, log is in /tmp/nsqlookupd.log"
 nsqlookupd > /tmp/nsqlookupd.log 2>&1 &
 lookupd_pid=$!
 
