@@ -14,7 +14,6 @@ import (
 
 type client struct {
 	publisher *nsq.Producer
-	consumer  *nsq.Consumer
 	reqTopic  string
 	rspTopic  string
 	msgNo     int
@@ -22,11 +21,10 @@ type client struct {
 	sync.Mutex
 }
 
-func NewClient(publisher *nsq.Producer, consumer *nsq.Consumer, reqTopic, rspTopic string) *client {
+func NewClient(publisher *nsq.Producer, reqTopic, rspTopic string) *client {
 	rand.Seed(time.Now().UnixNano())
 	return &client{
 		publisher: publisher,
-		consumer:  consumer,
 		reqTopic:  reqTopic,
 		rspTopic:  rspTopic,
 		msgNo:     rand.Intn(math.MaxInt32),

@@ -6,16 +6,23 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
+	"github.com/minus5/nsqm"
 	"github.com/minus5/nsqm/rpc"
-	"github.com/minus5/svckit/signal"
-	"github.com/nsqio/go-nsq"
+)
+
+const (
+	reqTopic = "request"
+	channel  = "server"
 )
 
 func main() {
-	nsqdTCPAddr := "127.0.0.1:4150"
-	cfg := nsq.NewConfig()
-	producer, err := nsq.NewProducer(nsqdTCPAddr, cfg)
+	cfgr := nsqm.Local()
+
+	producer, err := nsqm.NewProducer(cfgr)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -24,15 +31,7 @@ func main() {
 	srv := &server{}
 	transport := rpc.NewServer(ctx, srv, producer)
 
-	cfg = nsq.NewConfig()
-	reqTopic := "request"
-	channel := "server"
-	consumer, err := nsq.NewConsumer(reqTopic, channel, cfg)
-	if err != nil {
-		log.Fatal(err)
-	}
-	consumer.AddConcurrentHandlers(transport, 256)
-	err = consumer.ConnectToNSQD(nsqdTCPAddr)
+	consumer, err := nsqm.NewConsumer(cfgr, reqTopic, channel, transport)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -41,9 +40,13 @@ func main() {
 	defer cancel()
 	defer consumer.Stop()
 
-	//p.SetLogger(defaults.logger, defaults.logLevel)
-	//return &Producer{nsqProducer: p, topic: topic}, nil
-	signal.WaitForInterupt()
+	waitForInterupt()
+}
+
+func waitForInterupt() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+	<-c
 }
 
 type server struct{}

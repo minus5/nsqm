@@ -1,3 +1,5 @@
+// +build client
+
 package main
 
 import (
@@ -7,29 +9,27 @@ import (
 	"log"
 	"time"
 
+	"github.com/minus5/nsqm"
 	"github.com/minus5/nsqm/rpc"
-	nsq "github.com/nsqio/go-nsq"
+)
+
+const (
+	reqTopic = "request"
+	rspTopic = "response"
+	channel  = "client"
 )
 
 func main() {
-	nsqdTCPAddr := "127.0.0.1:4150"
-	cfg := nsq.NewConfig()
-	producer, err := nsq.NewProducer(nsqdTCPAddr, cfg)
+	cfgr := nsqm.Local()
+
+	producer, err := nsqm.NewProducer(cfgr)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	reqTopic := "request"
-	rspTopic := "response"
-	channel := "client"
-	cfg = nsq.NewConfig()
-	consumer, err := nsq.NewConsumer(rspTopic, channel, cfg)
-	if err != nil {
-		log.Fatal(err)
-	}
-	transport := rpc.NewClient(producer, consumer, reqTopic, rspTopic)
-	consumer.AddConcurrentHandlers(transport, 256)
-	err = consumer.ConnectToNSQD(nsqdTCPAddr)
+	transport := rpc.NewClient(producer, reqTopic, rspTopic)
+
+	consumer, err := nsqm.NewConsumer(cfgr, rspTopic, channel, transport)
 	if err != nil {
 		log.Fatal(err)
 	}
