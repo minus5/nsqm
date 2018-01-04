@@ -1,0 +1,29 @@
+#!/bin/bash
+set -e
+
+echo "starting nsqlookupd, log is in tmp/nsqlookupd.log"
+nsqlookupd > /tmp/nsqlookupd.log 2>&1 &
+lookupd_pid=$!
+
+echo "starting nsqd, log is in /tmp/nsqd.log"
+mkdir -p /tmp/nsqd
+nsqd -data-path=/tmp/nsqd -lookupd-tcp-address=127.0.0.1:4160 -broadcast-address=127.0.0.1 > /tmp/nsqd.log 2>&1 &
+nsqd_pid=$!
+
+echo "starting consul, log is in /tmp/consul.log"
+mkdir -p /tmp/consul_data/
+consul agent -config-file=consul.json > /tmp/consul.log 2>&1 &
+consul_pid=$!
+
+cleanup() {
+    echo "running cleanup" 
+    kill -s TERM $nsqd_consul
+    kill -s TERM $nsqd_pid
+    kill -s TERM $consul_pid
+    rm -rf /tmp/nsqd
+    rm -rf /tmp/consul_data/
+}
+trap cleanup INT TERM EXIT
+
+echo "starting nsq_tail"
+nsq_tail --nsqd-tcp-address=localhost:4150 --topic=hello_world

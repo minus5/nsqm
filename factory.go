@@ -2,9 +2,12 @@ package nsqm
 
 import nsq "github.com/nsqio/go-nsq"
 
+const (
+	defaultConcurrency = 256
+)
+
 type Configurator interface {
 	NSQDAddress() string
-	NSQDAddresses() []string
 	NSQLookupdAddresses() []string
 	Config() *nsq.Config
 	Concurrency() int
@@ -55,9 +58,6 @@ type localConfigurator struct{}
 func (c *localConfigurator) NSQDAddress() string {
 	return "127.0.0.1:4150"
 }
-func (c *localConfigurator) NSQDAddresses() []string {
-	return nil
-}
 
 func (c *localConfigurator) NSQLookupdAddresses() []string {
 	return nil
@@ -72,9 +72,46 @@ func (c *localConfigurator) Output(calldepth int, s string) error {
 }
 
 func (c *localConfigurator) Concurrency() int {
-	return 256
+	return defaultConcurrency
 }
 
-func (c *localConfigurator) SetLookupdDiscovery(ld lookupdDiscovery) {
+func (c *localConfigurator) SetLookupdDiscovery(ld lookupdDiscovery) {}
+
+type discovery interface {
+	NSQDAddress() (string, error)
+	NSQLookupdAddresses() ([]string, error)
+}
+
+func WithDiscovery(dcy discovery) Configurator {
+	return &discoveryConfigurator{dcy: dcy}
+}
+
+type discoveryConfigurator struct {
+	dcy discovery
+}
+
+func (c *discoveryConfigurator) NSQDAddress() string {
+	addr, _ := c.dcy.NSQDAddress()
+	return addr
+}
+
+func (c *discoveryConfigurator) NSQLookupdAddresses() []string {
+	addrs, _ := c.dcy.NSQLookupdAddresses()
+	return addrs
+}
+
+func (c *discoveryConfigurator) Config() *nsq.Config {
+	return nsq.NewConfig()
+}
+
+func (c *discoveryConfigurator) Output(calldepth int, s string) error {
+	return nil
+}
+
+func (c *discoveryConfigurator) Concurrency() int {
+	return defaultConcurrency
+}
+
+func (c *discoveryConfigurator) SetLookupdDiscovery(ld lookupdDiscovery) {
 
 }

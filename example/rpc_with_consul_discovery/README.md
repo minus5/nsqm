@@ -2,7 +2,7 @@ To run example:
 
 1. terminal start next
 ```
-mkdir -p /tmp/nsqd; nsqd -data-path=/tmp/nsqd; rm -rf /tmp/nsqd
+rm -rf ./tmp; mkdir -p ./tmp/nsqd; nsqd -lookupd-tcp-address=127.0.0.1:4160 -broadcast-address=127.0.0.1 -data-path=./tmp/nsqd
 ```
 
 2. terminal start server
