@@ -72,6 +72,11 @@ func (d *dcy) agentService(name string) (string, error) {
 }
 
 func (d *dcy) NSQLookupdAddresses() ([]string, error) {
+	d.Lock()
+	defer d.Unlock()
+	if d.lookupdAddrs != nil {
+		return d.lookupdAddrs, nil
+	}
 	ses, err := d.service(nsqLookupdHTTPServiceName)
 	if err != nil {
 		return nil, err

@@ -1,8 +1,6 @@
 package nsqm
 
 import (
-	"fmt"
-
 	"github.com/minus5/nsqm/discovery"
 	nsq "github.com/nsqio/go-nsq"
 )
@@ -111,7 +109,7 @@ func (c *discoveryConfigurator) Config() *nsq.Config {
 }
 
 func (c *discoveryConfigurator) Output(calldepth int, s string) error {
-	fmt.Printf("%s\n", s)
+	//fmt.Printf("%s\n", s)
 	return nil
 }
 

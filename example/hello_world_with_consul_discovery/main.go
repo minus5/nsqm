@@ -49,10 +49,9 @@ func main() {
 	// waith for consumer to receive a message
 	fmt.Printf("received: %s\n", <-msgs)
 
-	for {
-		fmt.Printf("received: %s\n", <-msgs)
-	}
-
+	// for {
+	// 	fmt.Printf("received: %s\n", <-msgs)
+	// }
 	producer.Stop()
 	consumer.Stop()
 }
