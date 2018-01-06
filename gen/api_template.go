@@ -24,7 +24,7 @@ const (
 
 type transport interface {
 	Call(ctx context.Context, method string, req []byte) ([]byte, string, error)
-  Close()
+  Close() error
 }
 
 type Client struct {

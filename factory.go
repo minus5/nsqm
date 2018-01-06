@@ -1,6 +1,8 @@
 package nsqm
 
 import (
+	"os"
+
 	"github.com/minus5/nsqm/discovery"
 	nsq "github.com/nsqio/go-nsq"
 )
@@ -16,6 +18,7 @@ type Configurator interface {
 	Concurrency() int
 	Output(calldepth int, s string) error
 	Subscribe(discovery.Subscriber)
+	NodeName() string
 }
 
 // type lookupdDiscovery interface {
@@ -78,12 +81,18 @@ func (c *localConfigurator) Concurrency() int {
 	return defaultConcurrency
 }
 
+func (c *localConfigurator) NodeName() string {
+	hostname, _ := os.Hostname()
+	return hostname
+}
+
 func (c *localConfigurator) Subscribe(s discovery.Subscriber) {}
 
 type discoverer interface {
 	NSQDAddress() (string, error)
 	NSQLookupdAddresses() ([]string, error)
 	Subscribe(discovery.Subscriber)
+	NodeName() string
 }
 
 func WithDiscovery(dcy discoverer) Configurator {
@@ -119,4 +128,8 @@ func (c *discoveryConfigurator) Concurrency() int {
 
 func (c *discoveryConfigurator) Subscribe(s discovery.Subscriber) {
 	c.dcy.Subscribe(s)
+}
+
+func (c *discoveryConfigurator) NodeName() string {
+	return c.dcy.NodeName()
 }

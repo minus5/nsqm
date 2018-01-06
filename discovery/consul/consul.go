@@ -176,3 +176,12 @@ func (d *dcy) updateLookups(addrs []string) {
 
 // testing register example:
 // curl -s -X PUT -d '{"Node":"app1","Address":"10.0.66.157","Service":{"Service":"nsqlookupd-http","Port":10901}}' http://127.0.0.1:8500/v1/catalog/register
+
+func (d *dcy) NodeName() string {
+	s, err := d.cli.Agent().Self()
+	if err != nil {
+		return ""
+	}
+	cfg := s["Config"]
+	return cfg["NodeName"].(string)
+}
