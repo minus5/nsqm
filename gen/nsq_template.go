@@ -44,18 +44,17 @@ func (c *client) Close() error {
 	return nil
 }
 
-func Client() (*api.Client, error) {
-	cfgr := nsqm.Local()
-	rspTopic := fmt.Sprintf("z...rsp-%s-%s", appName(), cfgr.NodeName())
+func Client(cfg *nsqm.Config) (*api.Client, error) {
+	rspTopic := fmt.Sprintf("z...rsp-%s-%s", appName(), cfg.NodeName)
 
-	producer, err := nsqm.NewProducer(cfgr)
+	producer, err := nsqm.NewProducer(cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	transport := rpc.NewClient(producer, reqTopic, rspTopic)
 
-	consumer, err := nsqm.NewConsumer(cfgr, rspTopic, channel, transport)
+	consumer, err := nsqm.NewConsumer(cfg, rspTopic, channel, transport)
 	if err != nil {
 		return nil, err
 	}
@@ -83,10 +82,9 @@ func (s *server) Close() error {
 	return nil
 }
 
-func Server(srv appServer) (io.Closer, error) {
-	cfgr := nsqm.Local()
 
-	producer, err := nsqm.NewProducer(cfgr)
+func Server(cfg *nsqm.Config, srv appServer) (io.Closer, error) {
+	producer, err := nsqm.NewProducer(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +92,7 @@ func Server(srv appServer) (io.Closer, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	transport := rpc.NewServer(ctx, srv, producer)
 
-	consumer, err := nsqm.NewConsumer(cfgr, reqTopic, channel, transport)
+	consumer, err := nsqm.NewConsumer(cfg, reqTopic, channel, transport)
 	if err != nil {
 		return nil, err
 	}
