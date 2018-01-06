@@ -1,0 +1,26 @@
+#!/bin/bash
+set -e
+
+consul_log=/tmp/consul.log
+lookupd_log=/tmp/nsqlookupd.log
+nsqd_log=/tmp/nsqd.log
+nsqd_data=/tmp/nsqd_data/
+
+echo "starting nsqlookupd, logging to $lookupd_log"
+nsqlookupd > $lookupd_log 2>&1 &
+
+echo "starting nsqd, logging to $nsqd_log"
+mkdir -p $nsqd_data
+nsqd -data-path=$nsqd_data -lookupd-tcp-address=127.0.0.1:4160 -broadcast-address=127.0.0.1 > $nsqd_log 2>&1 &
+
+echo "starting consul, logging to $consul_log"
+consul agent -dev -config-file=consul.json > $consul_log 2>&1 &
+
+sleep 1
+echo "starting nsq_tail"
+nsq_tail --nsqd-tcp-address=localhost:4150 --topic=service.req &
+nsq_tail --nsqd-tcp-address=localhost:4150 --topic=service.rsp
+
+echo cleanup
+rm -rf $nsqd_data
+killall consul nsqd nsqlookupd

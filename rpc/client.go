@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-type client struct {
+type Client struct {
 	publisher *nsq.Producer
 	reqTopic  string
 	rspTopic  string
@@ -21,9 +21,9 @@ type client struct {
 	sync.Mutex
 }
 
-func NewClient(publisher *nsq.Producer, reqTopic, rspTopic string) *client {
+func NewClient(publisher *nsq.Producer, reqTopic, rspTopic string) *Client {
 	rand.Seed(time.Now().UnixNano())
-	return &client{
+	return &Client{
 		publisher: publisher,
 		reqTopic:  reqTopic,
 		rspTopic:  rspTopic,
@@ -32,7 +32,7 @@ func NewClient(publisher *nsq.Producer, reqTopic, rspTopic string) *client {
 	}
 }
 
-func (c *client) HandleMessage(m *nsq.Message) error {
+func (c *Client) HandleMessage(m *nsq.Message) error {
 	e, err := NewEnvelope(m.Body)
 	if err != nil {
 		// TODO poruka ne valja
@@ -51,7 +51,7 @@ func (c *client) HandleMessage(m *nsq.Message) error {
 	return nil
 }
 
-func (c *client) Call(ctx context.Context, typ string, req []byte) ([]byte, string, error) {
+func (c *Client) Call(ctx context.Context, typ string, req []byte) ([]byte, string, error) {
 	correlationId := c.correlationID()
 	eReq := &Envelope{
 		Type:          typ,
@@ -79,11 +79,11 @@ func (c *client) Call(ctx context.Context, typ string, req []byte) ([]byte, stri
 
 }
 
-func (c *client) Close() {
+func (c *Client) Close() {
 	//t.publisher.
 }
 
-func (c *client) correlationID() string {
+func (c *Client) correlationID() string {
 	c.Lock()
 	defer c.Unlock()
 	if c.msgNo == math.MaxInt32 {
@@ -94,13 +94,13 @@ func (c *client) correlationID() string {
 	return strconv.Itoa(c.msgNo)
 }
 
-func (c *client) add(id string, ch chan *Envelope) {
+func (c *Client) add(id string, ch chan *Envelope) {
 	c.Lock()
 	defer c.Unlock()
 	c.s[id] = ch
 }
 
-func (c *client) get(id string) (chan *Envelope, bool) {
+func (c *Client) get(id string) (chan *Envelope, bool) {
 	c.Lock()
 	defer c.Unlock()
 	ch, ok := c.s[id]
@@ -110,7 +110,7 @@ func (c *client) get(id string) (chan *Envelope, bool) {
 	return ch, ok
 }
 
-func (c *client) timeout(id string) {
+func (c *Client) timeout(id string) {
 	c.Lock()
 	defer c.Unlock()
 	if _, found := c.s[id]; found {
