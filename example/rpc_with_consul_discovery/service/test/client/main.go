@@ -5,13 +5,30 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/minus5/nsqm"
+	"github.com/minus5/nsqm/discovery/consul"
 	"github.com/minus5/nsqm/example/rpc_with_consul_discovery/service/api"
 	"github.com/minus5/nsqm/example/rpc_with_consul_discovery/service/api/nsq"
 )
 
+func consulConfig() *nsqm.Config {
+	dcy, err := consul.Local()
+	if err != nil {
+		log.Fatal(err)
+	}
+	cfg, err := nsqm.WithDiscovery(dcy)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return cfg
+}
+
 func main() {
+	cfg := consulConfig()
+	cfg.NSQConfig.MaxInFlight = 1
+
 	ctx, cancel := context.WithCancel(context.Background())
-	c, err := nsq.Client()
+	c, err := nsq.Client(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
