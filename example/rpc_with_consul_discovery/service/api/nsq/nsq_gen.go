@@ -3,19 +3,26 @@ package nsq
 
 import (
 	"context"
+	"fmt"
 	"io"
+	"os"
+	"path"
 
 	"github.com/minus5/nsqm"
-	"github.com/minus5/nsqm/example/rpc_with_consul_discovery/service/api"
 	"github.com/minus5/nsqm/rpc"
 	nsq "github.com/nsqio/go-nsq"
+
+	"github.com/minus5/nsqm/example/rpc_with_consul_discovery/service/api"
 )
 
 var (
 	reqTopic = "service.req"
-	rspTopic = "service.rsp"
-	channel  = "app"
+	channel  = appName()
 )
+
+func appName() string {
+	return path.Base(os.Args[0])
+}
 
 type client struct {
 	producer  *nsq.Producer
@@ -35,6 +42,7 @@ func (c *client) Close() error {
 
 func Client() (*api.Client, error) {
 	cfgr := nsqm.Local()
+	rspTopic := fmt.Sprintf("z...rsp-%s-%s", appName(), cfgr.NodeName())
 
 	producer, err := nsqm.NewProducer(cfgr)
 	if err != nil {
