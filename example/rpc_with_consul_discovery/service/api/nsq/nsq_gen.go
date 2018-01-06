@@ -27,11 +27,11 @@ func appName() string {
 type client struct {
 	producer  *nsq.Producer
 	consumer  *nsq.Consumer
-	transport *rpc.Client
+	rpcClient *rpc.Client
 }
 
 func (c *client) Call(ctx context.Context, typ string, req []byte) ([]byte, string, error) {
-	return c.transport.Call(ctx, typ, req)
+	return c.rpcClient.Call(ctx, typ, req)
 }
 
 func (c *client) Close() error {
@@ -59,7 +59,7 @@ func Client() (*api.Client, error) {
 	return api.NewClient(&client{
 		producer:  producer,
 		consumer:  consumer,
-		transport: transport}), nil
+		rpcClient: transport}), nil
 }
 
 type appServer interface {
@@ -67,14 +67,14 @@ type appServer interface {
 }
 
 type server struct {
-	producer *nsq.Producer
-	cancel   func()
-	consumer *nsq.Consumer
+	producer  *nsq.Producer
+	ctxCancel func()
+	consumer  *nsq.Consumer
 }
 
 func (s *server) Close() error {
 	s.consumer.Stop() // stop receiving new request
-	s.cancel()        // cancel all processing
+	s.ctxCancel()     // cancel all processing
 	s.producer.Stop() // stop producing responses
 	return nil
 }
@@ -87,7 +87,7 @@ func Server(srv appServer) (io.Closer, error) {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, ctxCancel := context.WithCancel(context.Background())
 	transport := rpc.NewServer(ctx, srv, producer)
 
 	consumer, err := nsqm.NewConsumer(cfgr, reqTopic, channel, transport)
@@ -96,8 +96,8 @@ func Server(srv appServer) (io.Closer, error) {
 	}
 
 	return &server{
-		producer: producer,
-		cancel:   cancel,
-		consumer: consumer,
+		producer:  producer,
+		ctxCancel: ctxCancel,
+		consumer:  consumer,
 	}, nil
 }

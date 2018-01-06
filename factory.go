@@ -21,11 +21,6 @@ type Configurator interface {
 	NodeName() string
 }
 
-// type lookupdDiscovery interface {
-// 	DisconnectFromNSQLookupd(addr string) error
-// 	ConnectToNSQLookupd(addr string) error
-// }
-
 func NewProducer(cfgr Configurator) (*nsq.Producer, error) {
 	producer, err := nsq.NewProducer(cfgr.NSQDAddress(), cfgr.Config())
 	if err != nil {
