@@ -1,0 +1,29 @@
+{
+    "domain": "sd",
+    "bind_addr": "127.0.0.1",
+    "bootstrap": true,
+    "server": true,
+    "node_name": "node01",
+    "datacenter": "dev",
+    "ui": true,
+    "services": [
+        {
+            "id": "nsqlookupd-http",
+            "name": "nsqlookupd-http",
+            "address": "127.0.0.1",
+            "port": 4161
+        },
+        {
+            "id": "nsqlookupd-tcp",
+            "name": "nsqlookupd-tcp",
+            "address": "127.0.0.1",
+            "port": 4160
+        },
+        {
+            "id": "nsqd-tcp",
+            "name": "nsqd-tcp",
+            "address": "127.0.0.1",
+            "port": 4150
+        }
+    ]
+}

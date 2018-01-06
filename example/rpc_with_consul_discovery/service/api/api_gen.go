@@ -15,7 +15,7 @@ const (
 	MethodAdd      = "Add"
 	MethodCube     = "Cube"
 	MethodMultiply = "Multiply"
-	timeout        = 2 * time.Second
+	timeout        = 16 * time.Second
 )
 
 type transport interface {

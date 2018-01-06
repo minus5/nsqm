@@ -1,130 +1,32 @@
 package nsqm
 
-import (
-	"os"
+import nsq "github.com/nsqio/go-nsq"
 
-	"github.com/minus5/nsqm/discovery"
-	nsq "github.com/nsqio/go-nsq"
-)
-
-const (
-	defaultConcurrency = 256
-)
-
-type Configurator interface {
-	NSQDAddress() string
-	NSQLookupdAddresses() []string
-	Config() *nsq.Config
-	Concurrency() int
-	Output(calldepth int, s string) error
-	Subscribe(discovery.Subscriber)
-	NodeName() string
-}
-
-func NewProducer(cfgr Configurator) (*nsq.Producer, error) {
-	producer, err := nsq.NewProducer(cfgr.NSQDAddress(), cfgr.Config())
+func NewProducer(cfg *Config) (*nsq.Producer, error) {
+	producer, err := nsq.NewProducer(cfg.NSQDAddress, cfg.nsqConfig())
 	if err != nil {
 		return nil, err
 	}
-	producer.SetLogger(cfgr, nsq.LogLevelDebug)
+	producer.SetLogger(cfg, nsq.LogLevelDebug)
 	return producer, nil
 }
 
-func NewConsumer(cfgr Configurator, topic, channel string, handler nsq.Handler) (*nsq.Consumer, error) {
-	consumer, err := nsq.NewConsumer(topic, channel, cfgr.Config())
+func NewConsumer(cfg *Config, topic, channel string, handler nsq.Handler) (*nsq.Consumer, error) {
+	consumer, err := nsq.NewConsumer(topic, channel, cfg.nsqConfig())
 	if err != nil {
 		return nil, err
 	}
-	consumer.SetLogger(cfgr, nsq.LogLevelDebug)
-	consumer.AddConcurrentHandlers(handler, cfgr.Concurrency())
-	if addrs := cfgr.NSQLookupdAddresses(); addrs != nil {
+	consumer.SetLogger(cfg, nsq.LogLevelDebug)
+	consumer.AddConcurrentHandlers(handler, cfg.Concurrency)
+	if addrs := cfg.NSQLookupdAddresses; addrs != nil {
 		if err := consumer.ConnectToNSQLookupds(addrs); err != nil {
 			return nil, err
 		}
 	} else {
-		if err := consumer.ConnectToNSQD(cfgr.NSQDAddress()); err != nil {
+		if err := consumer.ConnectToNSQD(cfg.NSQDAddress); err != nil {
 			return nil, err
 		}
 	}
-	cfgr.Subscribe(consumer)
+	cfg.Subscribe(consumer)
 	return consumer, nil
-}
-
-func Local() Configurator {
-	return &localConfigurator{}
-}
-
-type localConfigurator struct{}
-
-func (c *localConfigurator) NSQDAddress() string {
-	return "127.0.0.1:4150"
-}
-
-func (c *localConfigurator) NSQLookupdAddresses() []string {
-	return nil
-}
-
-func (c *localConfigurator) Config() *nsq.Config {
-	return nsq.NewConfig()
-}
-
-func (c *localConfigurator) Output(calldepth int, s string) error {
-	return nil
-}
-
-func (c *localConfigurator) Concurrency() int {
-	return defaultConcurrency
-}
-
-func (c *localConfigurator) NodeName() string {
-	hostname, _ := os.Hostname()
-	return hostname
-}
-
-func (c *localConfigurator) Subscribe(s discovery.Subscriber) {}
-
-type discoverer interface {
-	NSQDAddress() (string, error)
-	NSQLookupdAddresses() ([]string, error)
-	Subscribe(discovery.Subscriber)
-	NodeName() string
-}
-
-func WithDiscovery(dcy discoverer) Configurator {
-	return &discoveryConfigurator{dcy: dcy}
-}
-
-type discoveryConfigurator struct {
-	dcy discoverer
-}
-
-func (c *discoveryConfigurator) NSQDAddress() string {
-	addr, _ := c.dcy.NSQDAddress()
-	return addr
-}
-
-func (c *discoveryConfigurator) NSQLookupdAddresses() []string {
-	addrs, _ := c.dcy.NSQLookupdAddresses()
-	return addrs
-}
-
-func (c *discoveryConfigurator) Config() *nsq.Config {
-	return nsq.NewConfig()
-}
-
-func (c *discoveryConfigurator) Output(calldepth int, s string) error {
-	//fmt.Printf("%s\n", s)
-	return nil
-}
-
-func (c *discoveryConfigurator) Concurrency() int {
-	return defaultConcurrency
-}
-
-func (c *discoveryConfigurator) Subscribe(s discovery.Subscriber) {
-	c.dcy.Subscribe(s)
-}
-
-func (c *discoveryConfigurator) NodeName() string {
-	return c.dcy.NodeName()
 }

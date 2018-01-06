@@ -16,10 +16,12 @@ nsqd -data-path=$nsqd_data -lookupd-tcp-address=127.0.0.1:4160 -broadcast-addres
 echo "starting consul, logging to $consul_log"
 consul agent -dev -config-file=consul.json > $consul_log 2>&1 &
 
+echo "starting nsqadmin, visible at: http://localhost:4171"
+nsqadmin -lookupd-http-address=127.0.0.1:4161 > /dev/null 2>&1 &
+
 sleep 1
 echo "starting nsq_tail"
-nsq_tail --nsqd-tcp-address=localhost:4150 --topic=service.req &
-nsq_tail --nsqd-tcp-address=localhost:4150 --topic=service.rsp
+nsq_tail --nsqd-tcp-address=localhost:4150 --topic=hello_world
 
 echo cleanup
 rm -rf $nsqd_data

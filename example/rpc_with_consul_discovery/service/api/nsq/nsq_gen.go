@@ -27,11 +27,11 @@ func appName() string {
 type client struct {
 	producer  *nsq.Producer
 	consumer  *nsq.Consumer
-	rpcClient *rpc.Client
+	transport *rpc.Client
 }
 
 func (c *client) Call(ctx context.Context, typ string, req []byte) ([]byte, string, error) {
-	return c.rpcClient.Call(ctx, typ, req)
+	return c.transport.Call(ctx, typ, req)
 }
 
 func (c *client) Close() error {
@@ -40,18 +40,17 @@ func (c *client) Close() error {
 	return nil
 }
 
-func Client() (*api.Client, error) {
-	cfgr := nsqm.Local()
-	rspTopic := fmt.Sprintf("z...rsp-%s-%s", appName(), cfgr.NodeName())
+func Client(cfg *nsqm.Config) (*api.Client, error) {
+	rspTopic := fmt.Sprintf("z...rsp-%s-%s", appName(), cfg.NodeName)
 
-	producer, err := nsqm.NewProducer(cfgr)
+	producer, err := nsqm.NewProducer(cfg)
 	if err != nil {
 		return nil, err
 	}
 
 	transport := rpc.NewClient(producer, reqTopic, rspTopic)
 
-	consumer, err := nsqm.NewConsumer(cfgr, rspTopic, channel, transport)
+	consumer, err := nsqm.NewConsumer(cfg, rspTopic, channel, transport)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +58,7 @@ func Client() (*api.Client, error) {
 	return api.NewClient(&client{
 		producer:  producer,
 		consumer:  consumer,
-		rpcClient: transport}), nil
+		transport: transport}), nil
 }
 
 type appServer interface {
@@ -67,37 +66,35 @@ type appServer interface {
 }
 
 type server struct {
-	producer  *nsq.Producer
-	ctxCancel func()
-	consumer  *nsq.Consumer
+	producer *nsq.Producer
+	cancel   func()
+	consumer *nsq.Consumer
 }
 
 func (s *server) Close() error {
 	s.consumer.Stop() // stop receiving new request
-	s.ctxCancel()     // cancel all processing
+	s.cancel()        // cancel all processing
 	s.producer.Stop() // stop producing responses
 	return nil
 }
 
-func Server(srv appServer) (io.Closer, error) {
-	cfgr := nsqm.Local()
-
-	producer, err := nsqm.NewProducer(cfgr)
+func Server(cfg *nsqm.Config, srv appServer) (io.Closer, error) {
+	producer, err := nsqm.NewProducer(cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	ctx, ctxCancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	transport := rpc.NewServer(ctx, srv, producer)
 
-	consumer, err := nsqm.NewConsumer(cfgr, reqTopic, channel, transport)
+	consumer, err := nsqm.NewConsumer(cfg, reqTopic, channel, transport)
 	if err != nil {
 		return nil, err
 	}
 
 	return &server{
-		producer:  producer,
-		ctxCancel: ctxCancel,
-		consumer:  consumer,
+		producer: producer,
+		cancel:   cancel,
+		consumer: consumer,
 	}, nil
 }

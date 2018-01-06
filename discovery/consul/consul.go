@@ -15,6 +15,10 @@ const (
 	nsqdTCPServiceName        = "nsqd-tcp"
 )
 
+func Local() (*dcy, error) {
+	return New("127.0.0.1:8500")
+}
+
 func New(addr string) (*dcy, error) {
 	cfg := api.DefaultConfig()
 	cfg.Address = addr

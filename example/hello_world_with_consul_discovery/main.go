@@ -17,7 +17,7 @@ const (
 
 func main() {
 	// discovery
-	dcy, err := consul.New("127.0.0.1:8500")
+	dcy, err := consul.Local()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -27,15 +27,18 @@ func main() {
 	// fmt.Printf("config from consul:\n\tnsqd: %s,\n\tnsqlookupds:%v\n", na, la)
 
 	// configuration with discovery
-	cfgr := nsqm.WithDiscovery(dcy)
+	cfg, err := nsqm.WithDiscovery(dcy)
+	if err != nil {
+		log.Fatal(err)
+	}
 	// create producer
-	producer, err := nsqm.NewProducer(cfgr)
+	producer, err := nsqm.NewProducer(cfg)
 	if err != nil {
 		log.Fatal(err)
 	}
 	// create consumer
 	h := &handler{msgs: make(chan string)}
-	consumer, err := nsqm.NewConsumer(cfgr, topic, channel, h)
+	consumer, err := nsqm.NewConsumer(cfg, topic, channel, h)
 	if err != nil {
 		log.Fatal(err)
 	}

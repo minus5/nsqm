@@ -19,7 +19,7 @@ func main() {
 	err := gen.Generate(gen.Config{
 		ServiceType:      reflect.TypeOf(service.Service{}),
 		NsqTopic:         "service.req",
-		TransportTimeout: 2,
+		TransportTimeout: 16,
 	})
 	if err != nil {
 		log.Fatal(err)

@@ -1,0 +1,17 @@
+#!/bin/bash
+set -e
+
+nsqd_log=/tmp/nsqd.log
+nsqd_data=/tmp/nsqd_data/
+
+echo "starting nsqd, logging to $nsqd_log"
+mkdir -p $nsqd_data
+nsqd -data-path=$nsqd_data > $nsqd_log 2>&1 &
+
+sleep 1
+echo "starting nsq_tail of the hello_world topic"
+nsq_tail --nsqd-tcp-address=localhost:4150 --topic=hello_world
+
+echo cleanup
+rm -rf $nsqd_data
+killall nsqd
