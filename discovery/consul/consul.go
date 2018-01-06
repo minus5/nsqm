@@ -2,12 +2,12 @@ package consul
 
 import (
 	"fmt"
+	"log"
 	"sync"
 	"time"
 
 	"github.com/hashicorp/consul/api"
 	"github.com/minus5/nsqm/discovery"
-	"github.com/minus5/svckit/log"
 )
 
 const (
@@ -113,7 +113,7 @@ func (d *dcy) monitor() {
 		}
 		ses, qm, err := d.cli.Health().Service(nsqLookupdHTTPServiceName, "", true, qo)
 		if err != nil {
-			log.Error(err) // TODO
+			log.Printf("error: %s", err) // TODO
 			time.Sleep(time.Second)
 			continue
 		}
@@ -152,7 +152,7 @@ func (d *dcy) updateLookups(addrs []string) {
 				fmt.Println("ConnectToNSQLookupd", addr) // TODO
 				if err := subscriber.ConnectToNSQLookupd(addr); err != nil {
 					// TODO logging
-					log.Error(err)
+					log.Printf("error: %s", err) // TODO
 				}
 			}
 		}
@@ -163,7 +163,7 @@ func (d *dcy) updateLookups(addrs []string) {
 				fmt.Println("DisconnectFromNSQLookupd", addr) // TODO
 				if err := subscriber.DisconnectFromNSQLookupd(addr); err != nil {
 					// TODO logging
-					log.Error(err)
+					log.Printf("error: %s", err) // TODO
 				}
 			}
 		}

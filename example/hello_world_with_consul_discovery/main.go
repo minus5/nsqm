@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/minus5/nsqm"
 	"github.com/minus5/nsqm/discovery/consul"
@@ -14,8 +15,6 @@ const (
 	channel = "app"
 )
 
-var msgs = make(chan string)
-
 func main() {
 	// discovery
 	dcy, err := consul.New("127.0.0.1:8500")
@@ -23,12 +22,9 @@ func main() {
 		log.Fatal(err)
 	}
 	// show discovered configuration
-	fmt.Print("NSQLookupdAddresses: ")
-	fmt.Println(dcy.NSQLookupdAddresses())
-	fmt.Printf("NSQDAddress: ")
-	fmt.Println(dcy.NSQDAddress())
-
-	//dcy.Monitor()
+	// la, _ := dcy.NSQLookupdAddresses()
+	// na, _ := dcy.NSQDAddress()
+	// fmt.Printf("config from consul:\n\tnsqd: %s,\n\tnsqlookupds:%v\n", na, la)
 
 	// configuration with discovery
 	cfgr := nsqm.WithDiscovery(dcy)
@@ -38,27 +34,30 @@ func main() {
 		log.Fatal(err)
 	}
 	// create consumer
-	consumer, err := nsqm.NewConsumer(cfgr, topic, channel, &handler{})
+	h := &handler{msgs: make(chan string)}
+	consumer, err := nsqm.NewConsumer(cfgr, topic, channel, h)
 	if err != nil {
 		log.Fatal(err)
 	}
-	// publish a message
-	if err := producer.Publish(topic, []byte("Hello World")); err != nil {
+	// send message with producer
+	msg := fmt.Sprintf("Hello Word at %v", time.Now())
+	if err := producer.Publish(topic, []byte(msg)); err != nil {
 		log.Fatal(err)
 	}
-	// waith for consumer to receive a message
-	fmt.Printf("received: %s\n", <-msgs)
 
-	// for {
-	// 	fmt.Printf("received: %s\n", <-msgs)
-	// }
+	// waith for consumer to receive a message
+	log.Printf("received: %s\n", <-h.msgs)
+
+	// cleanup
 	producer.Stop()
 	consumer.Stop()
 }
 
-type handler struct{}
+type handler struct {
+	msgs chan string
+}
 
 func (h *handler) HandleMessage(m *nsq.Message) error {
-	msgs <- string(m.Body)
+	h.msgs <- string(m.Body)
 	return nil
 }

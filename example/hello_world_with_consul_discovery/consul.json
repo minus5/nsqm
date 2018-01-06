@@ -5,7 +5,6 @@
     "server": true,
     "node_name": "node01",
     "datacenter": "dev",
-    "data_dir": "/tmp/consul_data/",
     "ui": true,
     "services": [
         {
