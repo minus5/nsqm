@@ -89,9 +89,9 @@ func Server(cfg *nsqm.Config, srv appServer) (io.Closer, error) {
 	}
 
 	ctx, ctxCancel := context.WithCancel(context.Background())
-	transport := rpc.NewServer(ctx, srv, producer)
+	rpcServer := rpc.NewServer(ctx, srv, producer)
 
-	consumer, err := nsqm.NewConsumer(cfg, reqTopic, channel, transport)
+	consumer, err := nsqm.NewConsumer(cfg, reqTopic, channel, rpcServer)
 	if err != nil {
 		return nil, err
 	}
