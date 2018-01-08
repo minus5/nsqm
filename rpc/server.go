@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/nsqio/go-nsq"
@@ -16,12 +17,15 @@ type appServer interface {
 	Serve(ctx context.Context, typ string, req []byte) ([]byte, error)
 }
 
+// Server rpc server side.
 type Server struct {
 	ctx      context.Context
 	srv      appServer
 	producer *nsq.Producer
 }
 
+// NewServer creates new rpc server for appServer.
+// producer will be used for sending replies.
 func NewServer(ctx context.Context, srv appServer, producer *nsq.Producer) *Server {
 	return &Server{
 		ctx:      ctx,
@@ -30,40 +34,39 @@ func NewServer(ctx context.Context, srv appServer, producer *nsq.Producer) *Serv
 	}
 }
 
+// HandleMessage server side handler.
 func (s *Server) HandleMessage(m *nsq.Message) error {
-	// raspakiraj poruku u envelope
-	eReq, err := NewEnvelope(m.Body)
+	fin := func() {
+		m.DisableAutoResponse()
+		m.Finish()
+	}
+	// decode message
+	req, err := Decode(m.Body)
 	if err != nil {
-		// TODO signalizirati da se nesto raspalo
-		// return errors.Wrap(err, "envelope unpack failed")
-		return nil
+		fin() // raise error without message requeue
+		return errors.Wrap(err, "envelope unpack failed")
 	}
-	// provjeri da li je expired
-	if eReq.Expired() {
-		//log.S("type", eReq.Type).S("correlationId", eReq.CorrelationId).Info("expired")
-		// TODO signalizirati da sam dobio expired poruku
-		return nil
+	// check expiration
+	if req.Expired() {
+		fin()
+		return fmt.Errorf("expired %s %d", req.Method, req.CorrelationID)
 	}
-	// radi request
-	rsp, appErr := s.srv.Serve(s.ctx, eReq.Type, eReq.Body)
-	// ako je timeout ili cancel
+	// call aplication
+	appRsp, appErr := s.srv.Serve(s.ctx, req.Method, req.Body)
+	// context timeout/cancel ?
 	if s.ctx.Err() != nil {
 		m.RequeueWithoutBackoff(RequeueDelay)
 		return nil
 	}
-	// treba li odgovoriti
-	if eReq.ReplyTo == "" {
+	// need to reply
+	if req.ReplyTo == "" {
 		return nil
 	}
-	// zapakuj
-	eRsp := eReq.Reply(rsp, appErr)
-	// posalji odgovor
-	if err := s.producer.Publish(eReq.ReplyTo, eRsp.Bytes()); err != nil {
+	// create reply
+	rsp := req.Reply(appRsp, appErr)
+	// send reply
+	if err := s.producer.Publish(req.ReplyTo, rsp.Encode()); err != nil {
 		return errors.Wrap(err, "nsq publish failed")
 	}
 	return nil
 }
-
-// TODO clean exit
-// mozda i ne treba ako zatvori ctx ugasit ce sve sto je in process
-// prije toga treba prestati primati poruke, ugasiti consumera

@@ -2,9 +2,9 @@ package rpc
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"math/rand"
-	"strconv"
 	"sync"
 	"time"
 
@@ -12,63 +12,76 @@ import (
 	"github.com/pkg/errors"
 )
 
+// Client rpc client side.
 type Client struct {
-	publisher *nsq.Producer
-	reqTopic  string
-	rspTopic  string
-	msgNo     int
-	s         map[string]chan *Envelope
+	publisher   *nsq.Producer
+	reqTopic    string
+	rspTopic    string
+	msgNo       uint32
+	subscribers map[uint32]chan *Envelope
 	sync.Mutex
 }
 
+// NewClient creates new rpc client.
+// publisher will be used for sending request on reqTopic.
+// rspTopic will be send in each message envelope, server will reply on that topic.
 func NewClient(publisher *nsq.Producer, reqTopic, rspTopic string) *Client {
 	rand.Seed(time.Now().UnixNano())
 	return &Client{
-		publisher: publisher,
-		reqTopic:  reqTopic,
-		rspTopic:  rspTopic,
-		msgNo:     rand.Intn(math.MaxInt32),
-		s:         make(map[string]chan *Envelope),
+		publisher:   publisher,
+		reqTopic:    reqTopic,
+		rspTopic:    rspTopic,
+		msgNo:       rand.Uint32(),
+		subscribers: make(map[uint32]chan *Envelope),
 	}
 }
 
+// HandleMessage
 func (c *Client) HandleMessage(m *nsq.Message) error {
-	e, err := NewEnvelope(m.Body)
-	if err != nil {
-		// TODO poruka ne valja
-		return nil
+	fin := func() {
+		m.DisableAutoResponse()
+		m.Finish()
 	}
-	if s, found := c.get(e.CorrelationId); found {
+	// unpack message
+	rsp, err := Decode(m.Body)
+	if err != nil {
+		fin()
+		return errors.Wrap(err, "envelope unpack failed")
+	}
+	// find subscriber waiting for response
+	if s, found := c.get(rsp.CorrelationID); found {
+		if s != nil {
+			s <- rsp
+		}
 		// when s == nil, means that request timed out, nobody is waiting for response
 		// nothing to do in that case
-		if s != nil {
-			s <- e
-		}
 		return nil
 	}
-	//log.S("id", e.CorrelationId).Info("subscriber not found")
-	// TODO logiranje
-	return nil
+	fin()
+	return fmt.Errorf("subscriber not found for %d", rsp.CorrelationID)
 }
 
+// Call entry point for request from application.
 func (c *Client) Call(ctx context.Context, typ string, req []byte) ([]byte, string, error) {
+	// craete envelope
 	correlationId := c.correlationID()
 	eReq := &Envelope{
-		Type:          typ,
+		Method:        typ,
 		ReplyTo:       c.rspTopic,
-		CorrelationId: correlationId,
+		CorrelationID: correlationId,
 		Body:          req,
 	}
 	if d, ok := ctx.Deadline(); ok {
 		eReq.ExpiresAt = d.Unix()
 	}
 	rspCh := make(chan *Envelope)
+	// subscriebe for response on that correlationID
 	c.add(correlationId, rspCh)
-
-	if err := c.publisher.Publish(c.reqTopic, eReq.Bytes()); err != nil {
+	// send request to the server
+	if err := c.publisher.Publish(c.reqTopic, eReq.Encode()); err != nil {
 		return nil, "", errors.Wrap(err, "nsq publish failed")
 	}
-
+	// wiat for response or context timeout/cancelation
 	select {
 	case rsp := <-rspCh:
 		return rsp.Body, rsp.Error, nil
@@ -76,44 +89,39 @@ func (c *Client) Call(ctx context.Context, typ string, req []byte) ([]byte, stri
 		c.timeout(correlationId)
 		return nil, "", ctx.Err()
 	}
-
 }
 
-func (c *Client) Close() {
-	//t.publisher.
-}
-
-func (c *Client) correlationID() string {
+func (c *Client) correlationID() uint32 {
 	c.Lock()
 	defer c.Unlock()
-	if c.msgNo == math.MaxInt32 {
-		c.msgNo = math.MinInt32
+	if c.msgNo == math.MaxUint32 {
+		c.msgNo = 0
 	} else {
 		c.msgNo++
 	}
-	return strconv.Itoa(c.msgNo)
+	return c.msgNo
 }
 
-func (c *Client) add(id string, ch chan *Envelope) {
+func (c *Client) add(id uint32, ch chan *Envelope) {
 	c.Lock()
 	defer c.Unlock()
-	c.s[id] = ch
+	c.subscribers[id] = ch
 }
 
-func (c *Client) get(id string) (chan *Envelope, bool) {
+func (c *Client) get(id uint32) (chan *Envelope, bool) {
 	c.Lock()
 	defer c.Unlock()
-	ch, ok := c.s[id]
+	ch, ok := c.subscribers[id]
 	if ok {
-		delete(c.s, id)
+		delete(c.subscribers, id)
 	}
 	return ch, ok
 }
 
-func (c *Client) timeout(id string) {
+func (c *Client) timeout(id uint32) {
 	c.Lock()
 	defer c.Unlock()
-	if _, found := c.s[id]; found {
-		c.s[id] = nil
+	if _, found := c.subscribers[id]; found {
+		c.subscribers[id] = nil
 	}
 }
