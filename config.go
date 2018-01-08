@@ -14,6 +14,8 @@ type Config struct {
 	NSQLookupdAddresses []string
 	Concurrency         int
 	NodeName            string
+	Logger              logger
+	LogLevel            nsq.LogLevel
 	dcy                 discoverer
 }
 
@@ -24,14 +26,18 @@ type discoverer interface {
 	NodeName() string
 }
 
+type logger interface {
+	Output(calldepth int, s string) error
+}
+
+type nullLogger struct{}
+
+func (nullLogger) Output(calldepth int, s string) error { return nil }
+
 func (c *Config) Subscribe(subscriber discovery.Subscriber) {
 	if c.dcy != nil {
 		c.dcy.Subscribe(subscriber)
 	}
-}
-
-func (c Config) Output(calldepth int, s string) error {
-	return nil
 }
 
 func (c *Config) nsqConfig() *nsq.Config {
@@ -57,6 +63,7 @@ func Local() *Config {
 		NSQConfig:           c,
 		Concurrency:         Concurrency,
 		NodeName:            hostname,
+		Logger:              &nullLogger{},
 	}
 }
 
@@ -78,6 +85,7 @@ func WithDiscovery(dcy discoverer) (*Config, error) {
 		NSQConfig:           c,
 		Concurrency:         Concurrency,
 		NodeName:            dcy.NodeName(),
+		Logger:              &nullLogger{},
 		dcy:                 dcy,
 	}, nil
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 
 	"github.com/minus5/nsqm"
 	"github.com/minus5/nsqm/discovery/consul"
@@ -13,6 +14,8 @@ import (
 )
 
 func consulConfig() *nsqm.Config {
+	logFlags := log.LstdFlags | log.Lmicroseconds | log.Lshortfile
+	log.SetFlags(logFlags)
 	dcy, err := consul.Local()
 	if err != nil {
 		log.Fatal(err)
@@ -21,6 +24,8 @@ func consulConfig() *nsqm.Config {
 	if err != nil {
 		log.Fatal(err)
 	}
+	cfg.Logger = log.New(os.Stderr, "", logFlags)
+	cfg.LogLevel = 2
 	return cfg
 }
 
