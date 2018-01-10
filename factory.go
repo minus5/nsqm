@@ -2,6 +2,7 @@ package nsqm
 
 import nsq "github.com/nsqio/go-nsq"
 
+// NewProducer creates nsq nsq.Producer from Config.
 func NewProducer(cfg *Config) (*nsq.Producer, error) {
 	producer, err := nsq.NewProducer(cfg.NSQDAddress, cfg.nsqConfig())
 	if err != nil {
@@ -11,6 +12,7 @@ func NewProducer(cfg *Config) (*nsq.Producer, error) {
 	return producer, nil
 }
 
+// NewConsumer creates and configures new nsq.Consumer.
 func NewConsumer(cfg *Config, topic, channel string, handler nsq.Handler) (*nsq.Consumer, error) {
 	consumer, err := nsq.NewConsumer(topic, channel, cfg.nsqConfig())
 	if err != nil {

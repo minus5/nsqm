@@ -15,10 +15,12 @@ const (
 	nsqdTCPServiceName        = "nsqd-tcp"
 )
 
+// Local creates discovery with local consul addres.
 func Local() (*dcy, error) {
 	return New("127.0.0.1:8500")
 }
 
+// New creates discovery using provided consul address.
 func New(addr string) (*dcy, error) {
 	cfg := api.DefaultConfig()
 	cfg.Address = addr

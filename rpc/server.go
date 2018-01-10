@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	RequeueDelay = time.Second
+	requeueDelay = time.Second
 )
 
 type appServer interface {
@@ -55,7 +55,7 @@ func (s *Server) HandleMessage(m *nsq.Message) error {
 	appRsp, appErr := s.srv.Serve(s.ctx, req.Method, req.Body)
 	// context timeout/cancel ?
 	if s.ctx.Err() != nil {
-		m.RequeueWithoutBackoff(RequeueDelay)
+		m.RequeueWithoutBackoff(requeueDelay)
 		return nil
 	}
 	// need to reply

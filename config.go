@@ -8,6 +8,7 @@ import (
 	nsq "github.com/nsqio/go-nsq"
 )
 
+// Config collects configuration parameters
 type Config struct {
 	NSQConfig           *nsq.Config
 	NSQDAddress         string
@@ -34,6 +35,8 @@ type nullLogger struct{}
 
 func (nullLogger) Output(calldepth int, s string) error { return nil }
 
+// Subscribe to nsqlookupd changes.
+// Wehn location of nsqlookupd changes discovery will notify subscriber.
 func (c *Config) Subscribe(subscriber discovery.Subscriber) {
 	if c.dcy != nil {
 		c.dcy.Subscribe(subscriber)
@@ -53,6 +56,8 @@ var (
 	Concurrency = 8
 )
 
+// Local returns Config for local nsqd.
+// Usefull in development.
 func Local() *Config {
 	hostname, _ := os.Hostname()
 	c := nsq.NewConfig()
@@ -67,6 +72,7 @@ func Local() *Config {
 	}
 }
 
+// WithDiscovery creates Config populated from discovery.x
 func WithDiscovery(dcy discoverer) (*Config, error) {
 	nsqd, err := dcy.NSQDAddress()
 	if err != nil {

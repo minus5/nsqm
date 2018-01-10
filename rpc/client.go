@@ -36,7 +36,7 @@ func NewClient(publisher *nsq.Producer, reqTopic, rspTopic string) *Client {
 	}
 }
 
-// HandleMessage
+// HandleMessage accepts incoming server reponses.
 func (c *Client) HandleMessage(m *nsq.Message) error {
 	fin := func() {
 		m.DisableAutoResponse()
@@ -64,11 +64,11 @@ func (c *Client) HandleMessage(m *nsq.Message) error {
 // Call entry point for request from application.
 func (c *Client) Call(ctx context.Context, typ string, req []byte) ([]byte, string, error) {
 	// craete envelope
-	correlationId := c.correlationID()
+	correlationID := c.correlationID()
 	eReq := &Envelope{
 		Method:        typ,
 		ReplyTo:       c.rspTopic,
-		CorrelationID: correlationId,
+		CorrelationID: correlationID,
 		Body:          req,
 	}
 	if d, ok := ctx.Deadline(); ok {
@@ -76,7 +76,7 @@ func (c *Client) Call(ctx context.Context, typ string, req []byte) ([]byte, stri
 	}
 	rspCh := make(chan *Envelope)
 	// subscriebe for response on that correlationID
-	c.add(correlationId, rspCh)
+	c.add(correlationID, rspCh)
 	// send request to the server
 	if err := c.publisher.Publish(c.reqTopic, eReq.Encode()); err != nil {
 		return nil, "", errors.Wrap(err, "nsq publish failed")
@@ -86,7 +86,7 @@ func (c *Client) Call(ctx context.Context, typ string, req []byte) ([]byte, stri
 	case rsp := <-rspCh:
 		return rsp.Body, rsp.Error, nil
 	case <-ctx.Done():
-		c.timeout(correlationId)
+		c.timeout(correlationID)
 		return nil, "", ctx.Err()
 	}
 }

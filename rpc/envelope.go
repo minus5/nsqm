@@ -44,7 +44,7 @@ func (m *Envelope) Expired() bool {
 	if m.ExpiresAt <= 0 {
 		return false
 	}
-	return time.Now().Unix() > int64(m.ExpiresAt)
+	return time.Now().Unix() > m.ExpiresAt
 }
 
 // Decode decodes envelope from bytes.

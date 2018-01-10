@@ -96,23 +96,22 @@ func Generate(c Config) error {
 		return err
 	}
 	fn := fmt.Sprintf("%s_gen.go", strings.ToLower(stc))
-	if err := g.execTemplate(serviceTemplate, fn); err != nil {
-		return err
-	}
-
-	return nil
+	return g.execTemplate(serviceTemplate, fn)
 }
 
 func (g *Generator) execTemplate(t *template.Template, fn string) error {
-	os.MkdirAll(path.Dir(fn), os.ModePerm)
+	if err := os.MkdirAll(path.Dir(fn), os.ModePerm); err != nil {
+		return err
+	}
 	f, err := os.Create(fn)
 	if err != nil {
 		return err
 	}
-	t.Execute(f, g.data)
-	f.Close()
-	err = exec.Command("go", "fmt", fn).Run()
-	if err != nil {
+	defer f.Close()
+	if err := t.Execute(f, g.data); err != nil {
+		return err
+	}
+	if err := exec.Command("go", "fmt", fn).Run(); err != nil {
 		return err
 	}
 	fmt.Printf("generated file %s\n", fn)
