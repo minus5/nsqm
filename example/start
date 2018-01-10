@@ -6,23 +6,33 @@ lookupd_log=/tmp/nsqlookupd.log
 nsqd_log=/tmp/nsqd.log
 nsqd_data=/tmp/nsqd_data/
 
-echo "starting nsqlookupd, logging to $lookupd_log"
+echo "starting consul     log: $consul_log, ui: http://localhost:8500"
+#consul agent -dev -config-file=consul.json > $consul_log 2>&1 &
+consul agent -dev -node=node01 -datacenter=dev > $consul_log 2>&1 &
+curl --retry 16 -s -X PUT -d '{"Name": "nsqlookupd-http", "Port":4161}' http://127.0.0.1:8500/v1/agent/service/register &
+curl --retry 16 -s -X PUT -d '{"Name": "nsqd-tcp", "Port":4150}' http://127.0.0.1:8500/v1/agent/service/register &
+
+echo "starting nsqlookupd log: $lookupd_log"
 nsqlookupd > $lookupd_log 2>&1 &
 
-echo "starting nsqd, logging to $nsqd_log"
+echo "starting nsqd       log: $nsqd_log"
 mkdir -p $nsqd_data
 nsqd -data-path=$nsqd_data -lookupd-tcp-address=127.0.0.1:4160 -broadcast-address=127.0.0.1 > $nsqd_log 2>&1 &
 
-echo "starting consul, logging to $consul_log"
-consul agent -dev -config-file=consul.json > $consul_log 2>&1 &
-
-echo "starting nsqadmin, visible at: http://localhost:4171"
+echo "starting nsqadmin   ui: http://localhost:4171"
 nsqadmin -lookupd-http-address=127.0.0.1:4161 > /dev/null 2>&1 &
 
 sleep 1
-echo "starting nsq_tail"
-nsq_tail --nsqd-tcp-address=localhost:4150 --topic=hello_world
+echo "tailing topics used in examples:"
+# topic used in hello_world example
+nsq_tail --nsqd-tcp-address=localhost:4150 --topic=hello_world         2>/dev/null | sed 's/.*/hello_world: &/'  &
+# topics used in simple_rpc example
+nsq_tail --nsqd-tcp-address=localhost:4150 --topic=request             2>/dev/null | sed 's/.*/> &/'  &
+nsq_tail --nsqd-tcp-address=localhost:4150 --topic=response            2>/dev/null | sed 's/.*/< &/'  &
+# topics use in rpc_example
+nsq_tail --nsqd-tcp-address=localhost:4150 --topic=service.req         2>/dev/null | sed 's/.*/> &/'  &
+nsq_tail --nsqd-tcp-address=localhost:4150 --topic=z...rsp-main-node01 2>/dev/null | sed 's/.*/< &/'  
 
 echo cleanup
 rm -rf $nsqd_data
-killall consul nsqd nsqlookupd
+killall consul nsqd nsqlookupd nsq_tail

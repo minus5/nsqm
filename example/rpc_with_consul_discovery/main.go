@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -24,24 +25,35 @@ func consulConfig() *nsqm.Config {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// tests are faster with this setting !?
+	cfg.NSQConfig.MaxInFlight = 1
 	cfg.Logger = log.New(os.Stderr, "", logFlags)
 	cfg.LogLevel = 2
 	return cfg
 }
 
 func main() {
-	cfg := consulConfig() // use consul stack
-	//cfg := nsqm.Local()   // or just local nsqd
+	// read useConsul command line switch
+	var useConsul bool
+	flag.BoolVar(&useConsul, "consul", false, "use consul for service discovery")
+	flag.Parse()
 
-	// tests are faster with this setting !?
-	cfg.NSQConfig.MaxInFlight = 1
+	// get configuration
+	var cfg *nsqm.Config
+	if useConsul {
+		cfg = consulConfig() // use consul stack
+	} else {
+		cfg = nsqm.Local() // use only local nsqd
+	}
 
+	// start server
 	srv, err := nsq.Server(cfg, service.New())
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer srv.Close()
 
+	// run client
 	client(cfg)
 }
 
@@ -87,6 +99,7 @@ func client(cfg *nsqm.Config) {
 	cube(15)
 }
 
+// showError example of transfering typed application errors from server to client
 func showError(err error) {
 	if err == nil {
 		return

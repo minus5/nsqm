@@ -20,12 +20,12 @@ func consulConfig() *nsqm.Config {
 	if err != nil {
 		log.Fatal(err)
 	}
+	cfg.NSQConfig.MaxInFlight = 1
 	return cfg
 }
 
 func main() {
 	cfg := consulConfig()
-	cfg.NSQConfig.MaxInFlight = 1
 
 	ctx, cancel := context.WithCancel(context.Background())
 	c, err := nsq.Client(cfg)

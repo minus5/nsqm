@@ -2,7 +2,7 @@ package consul
 
 import (
 	"fmt"
-	"log"
+	"strings"
 	"sync"
 	"time"
 
@@ -67,12 +67,16 @@ func (d *dcy) agentService(name string) (string, error) {
 		if svc.Service == name {
 			addr := svc.Address
 			if addr == "" {
-				addr = d.addr
+				addr = d.consulAddr()
 			}
 			return fmt.Sprintf("%s:%d", addr, svc.Port), nil
 		}
 	}
 	return "", nil
+}
+
+func (d *dcy) consulAddr() string {
+	return strings.Split(d.addr, ":")[0]
 }
 
 func (d *dcy) NSQLookupdAddresses() ([]string, error) {
@@ -117,7 +121,7 @@ func (d *dcy) monitor() {
 		}
 		ses, qm, err := d.cli.Health().Service(nsqLookupdHTTPServiceName, "", true, qo)
 		if err != nil {
-			log.Printf("error: %s", err) // TODO
+			//log.Printf("error: %s", err) // TODO
 			time.Sleep(time.Second)
 			continue
 		}
@@ -153,10 +157,10 @@ func (d *dcy) updateLookups(addrs []string) {
 			// add newly discovered lookupd
 			if !contains(d.lookupdAddrs, addr) {
 				changed = true
-				fmt.Println("ConnectToNSQLookupd", addr) // TODO
+				//fmt.Println("ConnectToNSQLookupd", addr) // TODO
 				if err := subscriber.ConnectToNSQLookupd(addr); err != nil {
 					// TODO logging
-					log.Printf("error: %s", err) // TODO
+					//log.Printf("error: %s", err) // TODO
 				}
 			}
 		}
@@ -164,16 +168,16 @@ func (d *dcy) updateLookups(addrs []string) {
 			// remove lookupd which don't exists any more
 			if !contains(addrs, addr) {
 				changed = true
-				fmt.Println("DisconnectFromNSQLookupd", addr) // TODO
+				//fmt.Println("DisconnectFromNSQLookupd", addr) // TODO
 				if err := subscriber.DisconnectFromNSQLookupd(addr); err != nil {
 					// TODO logging
-					log.Printf("error: %s", err) // TODO
+					//log.Printf("error: %s", err) // TODO
 				}
 			}
 		}
 	}
 	if changed {
-		fmt.Printf("updating lookupds to %v\n", addrs)
+		//fmt.Printf("updating lookupds to %v\n", addrs)
 		d.lookupdAddrs = addrs
 	}
 }
