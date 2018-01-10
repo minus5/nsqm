@@ -35,7 +35,7 @@ func main() {
 	rpcServer := rpc.NewServer(ctx, appServer, producer)
 
 	// consumer arround rpcServer
-	consumer, err := nsqm.NewConsumer(cfgr, reqTopic, channel, rcpServer)
+	consumer, err := nsqm.NewConsumer(cfgr, reqTopic, channel, rpcServer)
 	if err != nil {
 		log.Fatal(err)
 	}
