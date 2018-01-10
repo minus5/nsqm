@@ -5,7 +5,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/minus5/nsqm/example/rpc_with_consul_discovery/service/api"
+	"github.com/minus5/nsqm/example/rpc_with_code_generator/service/api"
 )
 
 func (s *Service) Serve(ctx context.Context, method string, buf []byte) ([]byte, error) {

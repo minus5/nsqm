@@ -9,9 +9,9 @@ import (
 
 	"github.com/minus5/nsqm"
 	"github.com/minus5/nsqm/discovery/consul"
-	"github.com/minus5/nsqm/example/rpc_with_consul_discovery/service"
-	"github.com/minus5/nsqm/example/rpc_with_consul_discovery/service/api"
-	"github.com/minus5/nsqm/example/rpc_with_consul_discovery/service/api/nsq"
+	"github.com/minus5/nsqm/example/rpc_with_code_generator/service"
+	"github.com/minus5/nsqm/example/rpc_with_code_generator/service/api"
+	"github.com/minus5/nsqm/example/rpc_with_code_generator/service/api/nsq"
 )
 
 func consulConfig() *nsqm.Config {
@@ -25,8 +25,6 @@ func consulConfig() *nsqm.Config {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// tests are faster with this setting !?
-	cfg.NSQConfig.MaxInFlight = 1
 	cfg.Logger = log.New(os.Stderr, "", logFlags)
 	cfg.LogLevel = 2
 	return cfg
@@ -45,6 +43,8 @@ func main() {
 	} else {
 		cfg = nsqm.Local() // use only local nsqd
 	}
+	// tests are faster with this setting !?
+	cfg.NSQConfig.MaxInFlight = 1
 
 	// start server
 	srv, err := nsq.Server(cfg, service.New())

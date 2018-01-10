@@ -11,7 +11,7 @@ import (
 	"log"
 	"reflect"
 
-	"github.com/minus5/nsqm/example/rpc_with_consul_discovery/service"
+	"github.com/minus5/nsqm/example/rpc_with_code_generator/service"
 	"github.com/minus5/nsqm/gen"
 )
 

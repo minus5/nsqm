@@ -12,7 +12,7 @@ import (
 	"github.com/minus5/nsqm/rpc"
 	nsq "github.com/nsqio/go-nsq"
 
-	"github.com/minus5/nsqm/example/rpc_with_consul_discovery/service/api"
+	"github.com/minus5/nsqm/example/rpc_with_code_generator/service/api"
 )
 
 var (

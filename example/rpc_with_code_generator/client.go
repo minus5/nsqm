@@ -1,3 +1,5 @@
+// +build client
+
 package main
 
 import (
@@ -7,8 +9,8 @@ import (
 
 	"github.com/minus5/nsqm"
 	"github.com/minus5/nsqm/discovery/consul"
-	"github.com/minus5/nsqm/example/rpc_with_consul_discovery/service/api"
-	"github.com/minus5/nsqm/example/rpc_with_consul_discovery/service/api/nsq"
+	"github.com/minus5/nsqm/example/rpc_with_code_generator/service/api"
+	"github.com/minus5/nsqm/example/rpc_with_code_generator/service/api/nsq"
 )
 
 func consulConfig() *nsqm.Config {

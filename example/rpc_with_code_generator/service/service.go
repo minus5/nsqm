@@ -3,11 +3,11 @@ package service
 import (
 	"context"
 
-	"github.com/minus5/nsqm/example/rpc_with_consul_discovery/service/api"
+	"github.com/minus5/nsqm/example/rpc_with_code_generator/service/api"
 )
 
 //go:generate find . -type f -name "*_gen.go" -exec rm -f {} ;
-//go:generate go install github.com/minus5/nsqm/example/rpc_with_consul_discovery/service/api
+//go:generate go install github.com/minus5/nsqm/example/rpc_with_code_generator/service/api
 //go:generate go run gen.go
 
 type Service struct{}
