@@ -1,18 +1,22 @@
-### motivation
+## motivation
 
 In [minus5](https://minus5.hr) products we use nsq for last few years and transferring billions of messages each day. It serves us very well and become essential part of our infrastructure.
+
 The other important component in our infrastructure is consul (for service discovery).
 Together they give us nice decoupling between services which produce and services which consume messages. 
 For consuming services all needed is connection to the consul client. There it will find lookupds and from lookupds location of producers (nsqd) of some topic.
 Producing services always have collocated nsqd (on the same docker host), so they only publish to that local nsqd.
 Nsqd-s get location of lookupds from consul and notifies them about topics thay have.
 
-It all works fine for one direction streaming. But what for rpc where client needs to send request to some service and get response. We were using http rest with service discovery from consul. I was investigating grpc, rpcx and standard library rpc. They all have some nice features and I have some compliments about all of them. 
+It all works fine for one direction streaming. 
+
+But what for rpc where client needs to send request to some service and get response. We were using http rest with service discovery from consul. I was investigating grpc, rpcx and standard library rpc. They all have some nice features and I have some compliments about all of them. 
 So we tried to use nsq transport for rpc.
 Idea is simple; clients sends message to server topic and listens for response on his private topic. In request client adds topic on which to send response. 
+
 Most interesting part of this project are examples so please check them.
 
-### examples
+## examples
 
 Running examples requires some part of infrastructure. At least running nsqd. To have all required infrastructure started use script in example directory:
 ```
@@ -25,7 +29,7 @@ Consul is needed for examples which uses it for lookupd discovery. In other case
 
 Script will also start nsq_tail for all topics which are used in examples. So you can use that terminal window to examine messages which are exchanged through nsq.
 
-# hello_world
+### hello_world
 
 This is basic example of sending and receiving message through nsq.
 In real world server and client parts will probably be in different applications.
@@ -59,10 +63,12 @@ go run simple_rpc/client.go
 
 Watch the terminal where start script is running to get the feeling about messages which are exchanged between client and server. You should see something like this:
 
+```
 > {"m":"Add","r":"response","c":470217093,"x":1515589846}
 > {"X":2,"Y":3}
 < {"c":470217093}
 < {"Z":5}
+```
 
 Lines with > are message parts send to the client. Each message consists of envelope, new line, and body. First two lines is a message to the server. First line is the envelope and second line is body. From envelope we can see that we are calling method Add, accepting response on the 'response' topic, c attribute is correlationID (you can see that it is same in request and response), and the last attribute is unix timestamp for message expiration (message is only valid until that time).
 Lines with < prefix represents response parts (from server to client). First line is again envelope and second is body of the response. In the envelope we have only correlationID.
@@ -132,11 +138,11 @@ go run rpc_with_code_generator/server.go
 go run rpc_with_code_generator/client.go
 ```
 
-### tools 
+## tools 
 If your are on the Mac this would be sufficient:
 ``` 
 brew install consul nsq
 ```
   
-### references
+## references
  * nsq rpc Erlang [ensq_rpc](https://github.com/project-fifo/ensq_rpc)
