@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 // method names constants
@@ -23,6 +21,24 @@ type transport interface {
 	Close() error
 }
 
+// callHook enables client applications to hook into process
+type callHook interface {
+	GetResponse(method string) ([]byte, string, bool)
+	OnResponse(method string, rspBuf []byte, appErr string) error
+	OnRequest(method string, reqBuf []byte) error
+	OnTimeout(method string, appErr string) error
+	OnError(error)
+}
+
+// noopHook no operation hook, using this where no hook is provided
+type noopHook struct{}
+
+func (h *noopHook) GetResponse(method string) ([]byte, string, bool)             { return nil, "", false }
+func (h *noopHook) OnResponse(method string, rspBuf []byte, appErr string) error { return nil }
+func (h *noopHook) OnRequest(method string, reqBuf []byte) error                 { return nil }
+func (h *noopHook) OnTimeout(method string, appErr string) error                 { return nil }
+func (h *noopHook) OnError(err error)                                            {}
+
 type Client struct {
 	t transport
 }
@@ -31,50 +47,81 @@ func NewClient(t transport) *Client {
 	return &Client{t: t}
 }
 
-func (c *Client) Add(ctx context.Context, req TwoReq) (*OneRsp, error) {
+func (c *Client) Add(ctx context.Context, req TwoReq, h callHook) (*OneRsp, error) {
 	rsp := new(OneRsp)
-	if err := c.call(ctx, MethodAdd, req, rsp); err != nil {
+	if err := c.call(ctx, MethodAdd, req, rsp, h); err != nil {
 		return nil, err
 	}
 	return rsp, nil
 }
 
-func (c *Client) Cube(ctx context.Context, req int) (*int, error) {
+func (c *Client) Cube(ctx context.Context, req int, h callHook) (*int, error) {
 	rsp := new(int)
-	if err := c.call(ctx, MethodCube, req, rsp); err != nil {
+	if err := c.call(ctx, MethodCube, req, rsp, h); err != nil {
 		return nil, err
 	}
 	return rsp, nil
 }
 
-func (c *Client) Multiply(ctx context.Context, req TwoReq) (*OneRsp, error) {
+func (c *Client) Multiply(ctx context.Context, req TwoReq, h callHook) (*OneRsp, error) {
 	rsp := new(OneRsp)
-	if err := c.call(ctx, MethodMultiply, req, rsp); err != nil {
+	if err := c.call(ctx, MethodMultiply, req, rsp, h); err != nil {
 		return nil, err
 	}
 	return rsp, nil
 }
 
-func (c *Client) call(ctx context.Context, method string, req, rsp interface{}) error {
+func (c *Client) call(ctx context.Context, method string, req, rsp interface{}, h callHook) error {
+	if h == nil {
+		h = &noopHook{}
+	}
+	if rspBuf, appErr, ok := h.GetResponse(method); ok {
+		// response already exists
+		if err := c.unmarshalRsp(rspBuf, appErr, rsp, h); err != nil {
+			return err
+		}
+		return nil
+	}
 	reqBuf, err := Marshal(req)
 	if err != nil {
-		return errors.Wrap(err, "marshal failed")
+		h.OnError(err)
+		return context.Canceled
 	}
-
+	if hErr := h.OnRequest(method, reqBuf); hErr != nil {
+		h.OnError(hErr)
+		return context.Canceled
+	}
 	ctxT, _ := context.WithTimeout(ctx, timeout)
 	rspBuf, appErr, err := c.t.Call(ctxT, method, reqBuf)
-	if ctxT.Err() != nil {
-		return ctxT.Err() // context.Canceled || context.DeadlineExceeded
+	if err := ctxT.Err(); err != nil {
+		h.OnError(err)
+		if err == context.DeadlineExceeded {
+			if hErr := h.OnTimeout(method, err.Error()); hErr != nil {
+				h.OnError(hErr)
+				return context.Canceled
+			}
+		}
+		return err // context.DeadlineExceeded || context.Canceled
 	}
 	if err != nil {
-		return errors.Wrap(err, "transport failed")
+		h.OnError(err)
+		return context.Canceled
 	}
+	// call OnResponse method hook
+	if hErr := h.OnResponse(method, rspBuf, appErr); hErr != nil {
+		h.OnError(hErr)
+		return context.Canceled
+	}
+	return c.unmarshalRsp(rspBuf, appErr, rsp, h)
+}
+
+func (c *Client) unmarshalRsp(rspBuf []byte, appErr string, rsp interface{}, h callHook) error {
 	if appErr != "" {
 		return toAppError(appErr)
 	}
-
 	if err := Unmarshal(rspBuf, rsp); err != nil {
-		return errors.Wrap(err, "unmarshal failed")
+		h.OnError(err)
+		return context.Canceled
 	}
 	return nil
 }
@@ -88,6 +135,10 @@ func toAppError(txt string) error {
 		return nil
 	}
 	switch txt {
+	case context.Canceled.Error():
+		return context.Canceled
+	case context.DeadlineExceeded.Error():
+		return context.DeadlineExceeded
 	case Overflow.Error():
 		return Overflow
 	}

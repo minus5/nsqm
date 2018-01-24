@@ -2,99 +2,27 @@
 package nsq
 
 import (
-	"context"
-	"fmt"
-	"io"
-	"os"
-	"path"
-
 	"github.com/minus5/nsqm"
-	"github.com/minus5/nsqm/rpc"
-	nsq "github.com/nsqio/go-nsq"
-
 	"github.com/minus5/nsqm/example/rpc_with_code_generator/service/api"
 )
 
 var (
 	reqTopic = "service.req"
-	channel  = appName()
 )
 
-func appName() string {
-	return path.Base(os.Args[0])
-}
-
-type client struct {
-	producer  *nsq.Producer
-	consumer  *nsq.Consumer
-	rpcClient *rpc.Client
-}
-
-func (c *client) Call(ctx context.Context, typ string, req []byte) ([]byte, string, error) {
-	return c.rpcClient.Call(ctx, typ, req)
-}
-
-func (c *client) Close() error {
-	c.producer.Stop()
-	c.consumer.Stop()
-	return nil
-}
-
 func Client(cfg *nsqm.Config) (*api.Client, error) {
-	rspTopic := fmt.Sprintf("z...rsp-%s-%s", appName(), cfg.NodeName)
-
-	producer, err := nsqm.NewProducer(cfg)
+	rpcClient, err := nsqm.NewRpcClient(cfg, reqTopic)
 	if err != nil {
 		return nil, err
 	}
-
-	rpcClient := rpc.NewClient(producer, reqTopic, rspTopic)
-
-	consumer, err := nsqm.NewConsumer(cfg, rspTopic, channel, rpcClient)
-	if err != nil {
-		return nil, err
-	}
-
-	return api.NewClient(&client{
-		producer:  producer,
-		consumer:  consumer,
-		rpcClient: rpcClient}), nil
+	return api.NewClient(rpcClient), nil
 }
 
-type appServer interface {
-	Serve(ctx context.Context, typ string, req []byte) ([]byte, error)
+type Closer interface {
+	Stop()
+	Close()
 }
 
-type server struct {
-	producer  *nsq.Producer
-	ctxCancel func()
-	consumer  *nsq.Consumer
-}
-
-func (s *server) Close() error {
-	s.consumer.Stop() // stop receiving new request
-	s.ctxCancel()     // cancel all processing
-	s.producer.Stop() // stop producing responses
-	return nil
-}
-
-func Server(cfg *nsqm.Config, srv appServer) (io.Closer, error) {
-	producer, err := nsqm.NewProducer(cfg)
-	if err != nil {
-		return nil, err
-	}
-
-	ctx, ctxCancel := context.WithCancel(context.Background())
-	rpcServer := rpc.NewServer(ctx, srv, producer)
-
-	consumer, err := nsqm.NewConsumer(cfg, reqTopic, channel, rpcServer)
-	if err != nil {
-		return nil, err
-	}
-
-	return &server{
-		producer:  producer,
-		ctxCancel: ctxCancel,
-		consumer:  consumer,
-	}, nil
+func Server(cfg *nsqm.Config, srv nsqm.AppServer) (Closer, error) {
+	return nsqm.NewRpcServer(cfg, reqTopic, srv)
 }

@@ -68,7 +68,7 @@ func client(cfg *nsqm.Config) {
 
 	add := func(x, y int) {
 		fmt.Printf("%d + %d = ", x, y)
-		rsp, err := c.Add(ctx, api.TwoReq{X: x, Y: y})
+		rsp, err := c.Add(ctx, api.TwoReq{X: x, Y: y}, nil)
 		showError(err)
 		if err == nil {
 			fmt.Printf("%d\n", rsp.Z)
@@ -76,7 +76,7 @@ func client(cfg *nsqm.Config) {
 	}
 	multiply := func(x, y int) {
 		fmt.Printf("%d * %d = ", x, y)
-		rsp, err := c.Multiply(ctx, api.TwoReq{X: x, Y: y})
+		rsp, err := c.Multiply(ctx, api.TwoReq{X: x, Y: y}, nil)
 		showError(err)
 		if err == nil {
 			fmt.Printf("%d\n", rsp.Z)
@@ -84,7 +84,7 @@ func client(cfg *nsqm.Config) {
 	}
 	cube := func(x int) {
 		fmt.Printf("%d^2 = ", x)
-		rsp, err := c.Cube(ctx, x)
+		rsp, err := c.Cube(ctx, x, nil)
 		showError(err)
 		if err == nil {
 			fmt.Printf("%d\n", *rsp)

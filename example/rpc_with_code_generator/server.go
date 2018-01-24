@@ -15,6 +15,7 @@ import (
 )
 
 func consulConfig() *nsqm.Config {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
 	dcy, err := consul.Local()
 	if err != nil {
 		log.Fatal(err)
