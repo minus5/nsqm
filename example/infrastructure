@@ -9,8 +9,8 @@ nsqd_data=/tmp/nsqd_data/
 echo "starting consul     log: $consul_log, ui: http://localhost:8500"
 #consul agent -dev -config-file=consul.json > $consul_log 2>&1 &
 consul agent -dev -node=node01 -datacenter=dev > $consul_log 2>&1 &
-curl --retry 16 -s -X PUT -d '{"Name": "nsqlookupd-http", "Port":4161}' http://127.0.0.1:8500/v1/agent/service/register &
-curl --retry 16 -s -X PUT -d '{"Name": "nsqd-tcp", "Port":4150}' http://127.0.0.1:8500/v1/agent/service/register &
+curl --retry-connrefused --retry-delay 1 --retry 128 -s -X PUT -d '{"Name": "nsqlookupd-http", "Port":4161}' http://127.0.0.1:8500/v1/agent/service/register &
+curl --retry-connrefused --retry-delay 1 --retry 128 -s -X PUT -d '{"Name": "nsqd-tcp", "Port":4150}' http://127.0.0.1:8500/v1/agent/service/register &
 
 echo "starting nsqlookupd log: $lookupd_log"
 nsqlookupd > $lookupd_log 2>&1 &
