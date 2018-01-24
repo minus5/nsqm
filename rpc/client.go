@@ -61,8 +61,12 @@ func (c *Client) HandleMessage(m *nsq.Message) error {
 	return fmt.Errorf("subscriber not found for %d", rsp.CorrelationID)
 }
 
-// Call entry point for request from application.
 func (c *Client) Call(ctx context.Context, typ string, req []byte) ([]byte, string, error) {
+	return c.CallTopic(ctx, c.reqTopic, typ, req)
+}
+
+// Call entry point for request from application.
+func (c *Client) CallTopic(ctx context.Context, reqTopic, typ string, req []byte) ([]byte, string, error) {
 	// craete envelope
 	correlationID := c.correlationID()
 	eReq := &Envelope{
@@ -78,7 +82,7 @@ func (c *Client) Call(ctx context.Context, typ string, req []byte) ([]byte, stri
 	// subscriebe for response on that correlationID
 	c.add(correlationID, rspCh)
 	// send request to the server
-	if err := c.publisher.Publish(c.reqTopic, eReq.Encode()); err != nil {
+	if err := c.publisher.Publish(reqTopic, eReq.Encode()); err != nil {
 		return nil, "", errors.Wrap(err, "nsq publish failed")
 	}
 	// wiat for response or context timeout/cancelation
