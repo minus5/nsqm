@@ -11,8 +11,12 @@ import (
 )
 
 const (
-	nsqLookupdHTTPServiceName = "nsqlookupd-http"
-	nsqdTCPServiceName        = "nsqd-tcp"
+	nsqLookupdHTTPServiceName      = "nsqlookupd-http"
+	nsqLookupdHTTPServiceNameByTag = "nsqlookupd"
+	nsqLookupdHTTPServiceTag       = "http"
+	nsqdTCPServiceName             = "nsqd-tcp"
+	nsqdTCPServiceNameByTag        = "nsqd"
+	nsqdTCPServiceTag              = "tcp"
 )
 
 // Local creates discovery with local consul addres.
@@ -40,8 +44,14 @@ type dcy struct {
 	monitorOnce sync.Once
 }
 
+type service struct {
+	name string
+	tag  string
+}
+
 func (d *dcy) NSQDAddress() (string, error) {
-	addr, err := d.agentService(nsqdTCPServiceName)
+	s := []service{{nsqdTCPServiceName, ""}, {nsqdTCPServiceNameByTag, nsqdTCPServiceTag}}
+	addr, err := d.agentService(s)
 	if err != nil {
 		return "", err
 	}
@@ -49,29 +59,39 @@ func (d *dcy) NSQDAddress() (string, error) {
 		return addr, err
 	}
 
-	ses, err := d.service(nsqdTCPServiceName)
+	ses, err := d.service(nsqdTCPServiceName, "")
 	if err != nil {
 		return "", err
 	}
 	addrs := parseServiceEntries(ses)
+	if len(addrs) != 0 {
+		return addrs[0], nil
+	}
+	ses, err = d.service(nsqdTCPServiceNameByTag, nsqdTCPServiceTag)
+	if err != nil {
+		return "", err
+	}
+	addrs = parseServiceEntries(ses)
 	if len(addrs) == 0 {
 		return "", fmt.Errorf("not found")
 	}
 	return addrs[0], nil
 }
 
-func (d *dcy) agentService(name string) (string, error) {
+func (d *dcy) agentService(services []service) (string, error) {
 	svcs, err := d.cli.Agent().Services()
 	if err != nil {
 		return "", err
 	}
 	for _, svc := range svcs {
-		if svc.Service == name {
-			addr := svc.Address
-			if addr == "" {
-				addr = d.consulAddr()
+		for _, s := range services {
+			if svc.Service == s.name && contains(svc.Tags, s.tag) {
+				addr := svc.Address
+				if addr == "" {
+					addr = d.consulAddr()
+				}
+				return fmt.Sprintf("%s:%d", addr, svc.Port), nil
 			}
-			return fmt.Sprintf("%s:%d", addr, svc.Port), nil
 		}
 	}
 	return "", nil
@@ -87,7 +107,17 @@ func (d *dcy) NSQLookupdAddresses() ([]string, error) {
 	if d.lookupdAddrs != nil {
 		return d.lookupdAddrs, nil
 	}
-	ses, err := d.service(nsqLookupdHTTPServiceName)
+	ses, err := d.service(nsqLookupdHTTPServiceName, "")
+	if err != nil {
+		return nil, err
+	}
+	lookupdAddrs := parseServiceEntries(ses)
+	if len(lookupdAddrs) != 0 {
+		d.lookupdAddrs = lookupdAddrs
+		return d.lookupdAddrs, nil
+	}
+
+	ses, err = d.service(nsqLookupdHTTPServiceNameByTag, nsqLookupdHTTPServiceTag)
 	if err != nil {
 		return nil, err
 	}
@@ -95,8 +125,8 @@ func (d *dcy) NSQLookupdAddresses() ([]string, error) {
 	return d.lookupdAddrs, nil
 }
 
-func (d *dcy) service(name string) ([]*api.ServiceEntry, error) {
-	ses, _, err := d.cli.Health().Service(name, "", true, nil)
+func (d *dcy) service(name, tag string) ([]*api.ServiceEntry, error) {
+	ses, _, err := d.cli.Health().Service(name, tag, true, nil)
 	return ses, err
 }
 
@@ -126,6 +156,14 @@ func (d *dcy) monitor() {
 			//log.Printf("error: %s", err) // TODO
 			time.Sleep(time.Second)
 			continue
+		}
+		if len(ses) == 0 {
+			ses, qm, err = d.cli.Health().Service(nsqLookupdHTTPServiceNameByTag, nsqLookupdHTTPServiceTag, true, qo)
+			if err != nil {
+				//log.Printf("error: %s", err) // TODO
+				time.Sleep(time.Second)
+				continue
+			}
 		}
 		addrs := parseServiceEntries(ses)
 		d.updateLookups(addrs)
@@ -194,4 +232,13 @@ func (d *dcy) NodeName() string {
 	}
 	cfg := s["Config"]
 	return cfg["NodeName"].(string)
+}
+
+func contains(s []string, e string) bool {
+	for _, a := range s {
+		if a == e {
+			return true
+		}
+	}
+	return false
 }
